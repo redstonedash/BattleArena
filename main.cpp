@@ -1,123 +1,139 @@
 #include <iostream>
-#include <cassert>
-#include <math.h>
-#include <time.h>
+#include <fstream>
+#include <string>
+#pragma warning(push)
+#pragma warning( disable : 4996)
 
-int numberOfDeaths = 0;
-float currentTime = 0;
-const int MAX_PLAYERS = 1000;
+std::fstream file;
 
-struct Player {
-	int ID = 0;
-	int HP;
-	unsigned int posX;
-	unsigned int posY;
-	float timeOfNextAction;
-	float speed;
-	float attackSpeed;
-	bool dead = false;
-};
-Player PriorityQue[MAX_PLAYERS];
+void saveRecord(char* fullPath, char* partPath) {
+	std::string ID;
+	std::string data;
 
-void sort(Player arr[MAX_PLAYERS]) {
-	for (int i = 0; i < MAX_PLAYERS; i++) {
-		int minIndex = -1;
-		float min = 0;
-		for (int j = i+1; j < MAX_PLAYERS; j++) {
-			if (arr[j].timeOfNextAction < min || minIndex == -1) {
-				min = arr[j].timeOfNextAction;
-				minIndex = j;
+	std::cout << "what is the name of your entry? WARNING: entering an existing entry will update it's contents\n";
+	std::getline(std::cin, ID);
+	std::cout << "what is your entry?\n";
+	std::getline(std::cin, data);
+	std::fstream tempFile;
+	char* modifiedPath = std::strcat(std::strcat(partPath, ID.c_str()), ".bin");
+	std::cout << modifiedPath << "\n";
+	if (!remove(modifiedPath)){
+		file << ID << "\n";
+	}
+	tempFile.open(modifiedPath, std::ios::app | std::ios::binary);
+	tempFile << data;
+	file.flush();
+	file.close();
+	tempFile.flush();
+	tempFile.close();
+
+}
+
+void displayRecord(char* fullPath, char* partPath) {
+	std::string ID;
+	std::cout << "what is the name of your entry?\n";
+	std::getline(std::cin, ID);
+	char data[] = {0};
+	file.seekg(0, std::ios::beg);
+	bool isFound = false;
+	bool matchingSoFar = true;
+	int index = 0;
+	while (true){ //confirm that this bin file exist in the data base
+		file.read((char*)&data, 1);
+		if (file.eof()) {
+			break;
+		}
+		if (matchingSoFar) {
+			if (index == ID.length() && data[0] == '\n') {
+				isFound = true;
+				break;
 			}
-			if(min<arr[i].timeOfNextAction)
-				std::swap(arr[i], arr[minIndex]);
+			if (ID.length()>index && ID.at(index)!=data[0]) {
+				matchingSoFar = false;
+				index = 0;
+			} else if(ID.length()>index) {
+				index++;
+			} else {
+				index = 0;
+				matchingSoFar = false;
+			}
+		}
+		if (data[0] == '\n') {
+			index = 0;
+			matchingSoFar = true;
 		}
 	}
-}
-
-void move(Player *p) {
-	p->posX += rand() % 3 - 1;
-	p->posY += rand() % 3 - 1;
-	p->posX %= 11;
-	p->posY %= 11;
-	currentTime = p->timeOfNextAction;
-	p->timeOfNextAction=currentTime+p->speed;
-	std::cout << "Player " << p->ID << " is moving to " << p->posX << ", " << p->posY << "\n";
-	sort(PriorityQue);
-}
-
-void attack(Player *p) {
-	Player *target = NULL;
-	int x = p->posX + rand() % 3 - 1;
-	int y = p->posY + rand() % 3 - 1;
-	x %= 11;
-	y %= 11;
-	for (int i = 0; i < MAX_PLAYERS; i++) {
-		if (PriorityQue[i].posX == x && PriorityQue[i].posY == y) {
-			target = &PriorityQue[i];
-		}
-	}
-	currentTime = p->timeOfNextAction;
-	p->timeOfNextAction = currentTime + p->attackSpeed;
-	if (target == NULL) return;
-	std::cout << "Player " << p->ID << " is attacking player " << target->ID << "\n";
-	if (target->dead) {
-		std::cout << "Player " << target->ID << " is already dead \n";
-	} else {
-		int rng = rand() % 101;
-		target->HP -= rng;
-		std::cout << "Player " << target->ID << " takes " << rng << " damage!\n";
-		if (target->HP <= 0) {
-			numberOfDeaths++;
-			target->dead = true;
-			std::cout << "Player " << target->ID << " dies!\n";
-		}
-	}
-	sort(PriorityQue);
-}
-
-int main() {
-	srand(time(0));
-	//init
-	for (int i = 0; i < MAX_PLAYERS; i++) {
-		PriorityQue[i].ID = i;
-		PriorityQue[i].HP = rand()%101;
-		PriorityQue[i].posX = rand() % 11;
-		PriorityQue[i].posY = rand() % 11;
-		PriorityQue[i].timeOfNextAction = (float) rand()/RAND_MAX;
-		PriorityQue[i].speed = (float)rand() / RAND_MAX;
-		PriorityQue[i].attackSpeed = ((float)rand() / RAND_MAX)*2.0f;
-		std::cout << (float)rand() / RAND_MAX;
-	}
-	sort(PriorityQue);
-	//game loop
-	bool isRunning = true;
-	Player data;
-	while (isRunning) {
-		isRunning = false;
-		for (int i = 0; i < MAX_PLAYERS; i++) {
-			if (!PriorityQue[i].dead) {
-				isRunning = true;
-				move(&PriorityQue[i]);
+	if (isFound) {
+		std::fstream tempFile;
+		char* modifiedPath = std::strcat(std::strcat(partPath, ID.c_str()), ".bin");
+		tempFile.open(modifiedPath, std::ios::in | std::ios::binary);
+		tempFile.seekg(0, std::ios::beg);
+		while (true) {
+			tempFile.read((char*)&data, 1);
+			if (!tempFile.eof()) {
+				std::cout << data[0];
+			} else {
 				break;
 			}
 		}
-		for (int i = 0; i < MAX_PLAYERS; i++) {
-			if (!PriorityQue[i].dead) {
-				attack(&PriorityQue[i]);
-				break;
-			}
-		}
-		if (numberOfDeaths == MAX_PLAYERS - 1) {
-			isRunning = false;
+		return;
+	}
+	else {
+		std::cout << "Entry not found!\n";
+	}
+
+	return;
+}
+
+
+void help() {
+	std::cout <<
+		"Hello! Welcome to Data Manager"
+		"the second parameter should be what you want to do"
+		"the first parameter you give us should be the name of the data base"
+		"you can either (s)ave a new record, (d)isplay a record"
+		<< "\n";
+}
+
+int main(int argc, char* argv[]) {
+	if (argc <= 0 || argv[1][0] != 's' || argv[1][0] != 'd') {
+		help();
+		return 0;
+	}
+	for (int i = std::strlen(argv[0]); i > 0; i--) {
+		if (argv[0][i] != '\\') {
+			argv[0][i] = '\0';
+		} else { break; }
+	}
+	char * newArray = new char[std::strlen(argv[0]) + std::strlen(argv[2]) + 1];
+	int i = 0;
+	for (; i < std::strlen(newArray) + 1; i++) {
+		if (i <= std::strlen(argv[0])&&!(argv[0][i]=='\0')) {
+			newArray[i] = argv[0][i];
+		} else {
 			break;
 		}
 	}
-	//find last player
-	for (int i = 0; i < MAX_PLAYERS; i++) {
-		if (!PriorityQue[i].dead) {
-			std::cout << "Player " << PriorityQue[i].ID << " wins with " << PriorityQue[i].HP << " HP remaning!";
-			return 0;
-		}
+	for (int j = 0; i < std::strlen(newArray) + 1; i++) {
+		newArray[i] = argv[2][j];
+		j++;
 	}
-
+	std::fstream temp;
+	temp.open(newArray, std::ios::app | std::ios::binary);
+	temp.close();
+	switch (argv[1][0]) {
+	case 's':
+		file.open(newArray, std::ios::app | std::ios::binary);
+		saveRecord(newArray, argv[0]);
+		return 0;
+	case 'd':
+		file.open(newArray, std::ios::in | std::ios::binary);
+		displayRecord(newArray, argv[0]);
+		return 0;
+	default:
+		help();
+		return 0;
+	
+	}
 }
+#pragma warning(pop)
